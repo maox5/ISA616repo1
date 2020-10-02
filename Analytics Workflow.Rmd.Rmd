@@ -1,0 +1,184 @@
+---
+title: "Analytics Workflow"
+author: 
+  - 
+output: 
+  html_document:
+    code_folding: show
+    df_print: paged
+    number_sections: yes
+    theme: cerulean
+---
+
+***
+***
+
+>####**1 Overview**
+
+Bike sharing systems are new generation of traditional bicycle rental. The whole process from membership, rental and refund has become automatic. Users can easily rent bikes from a specific location and return to another location with these systems. Nowadays, because of their important role in daily traffic and energy-saving environment, the operation of these systems has also aroused great interest.
+
+We first analyze whether the number of registered users of the bike sharing system is affected by weather and holidays. Second, we explore whether there is a correlation between the total number of rentals and the season or holiday.
+
+<br/>
+
+>####**2 Data Description**
+
+The data set is Capital BikeShares which is a well-used system that people can rent bikes. The data includes with information on the rentals of bikes of 731 days between 1/1/2011 and 12/19/2012. The process for the membership, rental and return are automatic. There are 731 observations (not missing value) and 12 variables.The Capital BikeShare data set can be downloaded from https://www.capitalbikeshare.com.
+
+The variables include the following:
+
+* datetime - daily date
+
+* season - 1 = spring, 2 = summer, 3 = fall, 4 = winter
+
+* holiday - whether the day is considered a holiday
+
+* workingday - whether the day is neither a weekend nor holiday
+
+* weather - 1: Clear, Few clouds, Partly cloudy, Partly cloudy
+            2: Mist + Cloudy, Mist + Broken clouds, Mist + Few clouds, Mist
+            3: Light Snow, Light Rain + Thunderstorm + Scattered clouds, Light Rain + Scattered clouds
+            4: Heavy Rain + Ice Pallets + Thunderstorm + Mist, Snow + Fog
+            
+* temp - normalized temperature in Celsius. The values are divided to 41 (max)
+
+* atemp - normalized feeling temperature in Celsius. The values are divided to 50 (max)
+
+* humidity - normalized humidity. The values are divided to 100 (max)
+
+* windspeed - normalized wind speed. The values are divided to 67 (max)
+
+* casual - count of casual users
+
+* registered - count of registered users
+
+* count - number of total rentals (Note that casual+registered=count)
+
+<br/>
+
+>####**3 Data Preprocess**
+
+```{r}
+# read the dataset
+setwd("C:\\Users\\zhuzh\\Desktop\\class\\ISA616\\ISA616Repo")
+data = read.csv("day.csv", header=T)
+
+# remove irrelevant columns
+data = data[,-c(1,2,4,5)]
+
+# turn variables into categorical variables
+data$season = as.factor(data$season)
+data$weathersit = as.factor(data$weathersit)
+data$weekday = as.factor(data$weekday)
+```
+
+```{r}
+# remove outliers
+boxplot(data[,6:9], col="lightgrey")
+boxplot(data[,10:12], col="lightgrey")
+
+data = data[-which(data$hum==0),]
+data = data[-which(data$windspeed>0.5),]
+```
+
+
+```{r}
+# analysis of single variable
+par(mfrow=c(1,2))
+hist(data[,11], xlab="count of registered users", main="", col="lightgrey")
+hist(data[,12], xlab="count of total rentals", main="", col="lightgrey")
+```
+
+It can be found that the registered and count variables of the data are generally in a normal distribution.
+
+```{r}
+# correlation between variables
+library(corrplot)
+corr = cor(data[,c(2,4,6:9)])
+corrplot(corr)
+data = data[,-7]
+```
+
+When there is a strong correlation between two variables, whether positive correlation or negative correlation, the two variables cannot be included in the model at the same time. So, from the plot above, I remove the atemp variable.
+
+<br/>
+
+>####**4 Regression Model Output**
+
+**4.1 Registered Users**
+
+```{r}
+lm1 = lm(data$registered ~ holiday+weathersit, data = data)
+summary(lm1)
+```
+
+* Table 1: Model Estimation Result Table (Registered Users)
+
+| Variable Name | Coefficient | P-value |
+| :----: | :----: | :----: |
+| Intercept | 3955.18 | <0.0001 *** |
+| holiday | -1119.33 | 0.0007 *** |
+| weathersit2 | -579.48 | <0.0001 *** |
+| weathersit3 | -2285.33 | <0.0001 *** |
+
+<br/>
+
+As shown in Table 1, all variables are used for analysis, and the fitting effect of the model is good and all variables are significant. In summary, when controlling for other variables, if the day is a holiday, and the weather is the NO.1 type (Clear, Few clouds, Partly cloudy, Partly cloudy), the number of registered users of the shared system will increase.
+
+
+```{r}
+# model diagnosis
+par(mfrow=c(2,2))
+plot(lm1,which=c(1:4))
+```
+
+Figure 1 is a scatter plot of residuals and fitted values, each point is in line with the assumption of random error terms; Figure 2 is a QQ plot of random error terms, which is used to check the normality of the error term, as can be seen from the figure The normality is more obvious, and the tail has a slight deviation; Figure 4 is the COOK distance, and there is no strong influence point. From the above diagnosis chart, it can be basically determined that model performs well.
+
+<br/>
+
+**4.2 Total Rentals**
+
+```{r}
+lm2 = lm(data$cnt ~ holiday+season, data = data)
+summary(lm2)
+```
+
+* Table 2: Model Estimation Result Table (Total Rentals)
+
+| Variable Name | Coefficient | P-value |
+| :----: | :----: | :----: |
+| Intercept | 2641.4 | <0.0001 *** |
+| holiday | -531.9 | 0.126 |
+| season2 | 2362.5 | <0.0001 *** |
+| season3 | 3014.2 | <0.0001 *** |
+| season4 | 2104.7 | <0.0001 *** |
+
+<br/>
+
+As shown in Table 2, all variables are used for analysis, and the fitting effect of the model is not bad and season variables are significant. In summary, when controlling for other variables, If the day is autumn, the total number of users of the shared system will increase.
+
+
+```{r}
+# model diagnosis
+par(mfrow=c(2,2))
+plot(lm2,which=c(1:4))
+```
+
+Figure 1 is a scatter plot of residuals and fitted values, each point is in line with the assumption of random error terms; Figure 2 is a QQ plot of random error terms, which is used to check the normality of the error term, as can be seen from the figure The normality is more obvious, and the tail has a slight deviation; Figure 4 is the COOK distance, and there is no strong influence point. From the above diagnosis chart, it can be basically determined that model performs well.
+
+<br/>
+
+>####**5 Conclusion**
+
+Through regression analysis model, we can firstly draw conclusions that the number of registered users of the bike sharing system is affected by weather and holidays. Moreover, we find that there is a correlation between the total number of rentals and the season but the correlation with holidays is weak.
+
+
+<br/>
+
+<br/>
+
+
+
+
+
+
